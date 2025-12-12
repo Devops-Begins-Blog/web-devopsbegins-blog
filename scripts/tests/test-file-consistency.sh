@@ -226,7 +226,7 @@ test_concurrent_writes() {
     sleep 1
 
     # Count lines
-    local lines=$(docker exec "$wp1_container" wc -l < "$test_file" | tr -d ' ')
+    local lines=$(docker exec "$wp1_container" wc -l "$test_file" | awk '{print $1}')
 
     log_info "Total lines after concurrent writes: $lines"
 

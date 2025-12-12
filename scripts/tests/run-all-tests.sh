@@ -21,6 +21,22 @@ log_header() { echo -e "\n${BLUE}=========================================="; ec
 
 TEST_MODE="${1:-all}"
 
+cleanup_standalone() {
+    log_info "Cleaning up standalone environment (preserving MySQL volume)..."
+    # Stop and remove containers, but preserve mysql volume for faster restarts
+    docker compose -f "${PROJECT_ROOT}/docker-compose.standalone.yml" down --remove-orphans 2>/dev/null || true
+    # Only remove wp-content volume, keep mysql-data
+    docker volume rm devopsbegins-wp-content 2>/dev/null || true
+}
+
+cleanup_ha() {
+    log_info "Cleaning up HA environment (preserving MySQL volume)..."
+    # Stop and remove containers, but preserve mysql volume for faster restarts
+    docker compose -f "${PROJECT_ROOT}/docker-compose.ha.yml" down --remove-orphans 2>/dev/null || true
+    # Only remove non-mysql volumes
+    docker volume rm devopsbegins-wp-content-ha devopsbegins-redis-data 2>/dev/null || true
+}
+
 run_standalone_tests() {
     log_header "STANDALONE MODE TESTS"
 
@@ -29,7 +45,16 @@ run_standalone_tests() {
         return 0
     fi
 
+    # Clean up before starting
+    cleanup_standalone
+
     bash "${SCRIPT_DIR}/test-standalone-mode.sh"
+    local result=$?
+
+    # Clean up after finishing
+    cleanup_standalone
+
+    return $result
 }
 
 run_ha_tests() {
@@ -39,6 +64,9 @@ run_ha_tests() {
         log_error "docker-compose.ha.yml not found"
         return 1
     fi
+
+    # Clean up before starting (ensure fresh volumes)
+    cleanup_ha
 
     # Start HA environment
     log_info "Starting HA environment..."
@@ -50,9 +78,9 @@ run_ha_tests() {
 
     local failed=0
 
-    # Run HA mode tests
+    # Run HA mode tests (skip cleanup trap - we manage lifecycle here)
     log_header "HA Infrastructure Tests"
-    bash "${SCRIPT_DIR}/test-ha-mode.sh" || failed=$((failed + 1))
+    SKIP_CLEANUP=1 bash "${SCRIPT_DIR}/test-ha-mode.sh" || failed=$((failed + 1))
 
     # Run session persistence tests
     log_header "Session Persistence Tests"
@@ -66,13 +94,18 @@ run_ha_tests() {
     log_header "File Consistency Tests"
     bash "${SCRIPT_DIR}/test-file-consistency.sh" || failed=$((failed + 1))
 
+    # Clean up after all HA tests
+    cleanup_ha
+
     return $failed
 }
 
 cleanup_all() {
-    log_info "Cleaning up all test environments..."
-    docker compose -f "${PROJECT_ROOT}/docker-compose.ha.yml" down -v --remove-orphans 2>/dev/null || true
-    docker compose -f "${PROJECT_ROOT}/docker-compose.standalone.yml" down -v --remove-orphans 2>/dev/null || true
+    log_info "Cleaning up all test environments (preserving MySQL volumes)..."
+    docker compose -f "${PROJECT_ROOT}/docker-compose.ha.yml" down --remove-orphans 2>/dev/null || true
+    docker compose -f "${PROJECT_ROOT}/docker-compose.standalone.yml" down --remove-orphans 2>/dev/null || true
+    # Remove only non-mysql volumes
+    docker volume rm devopsbegins-wp-content devopsbegins-wp-content-ha devopsbegins-redis-data 2>/dev/null || true
 }
 
 # Main execution

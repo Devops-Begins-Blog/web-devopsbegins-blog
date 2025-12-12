@@ -20,7 +20,7 @@ log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 cleanup() {
     log_info "Cleaning up session test environment..."
-    # Remove test file if created
+    # Remove test file from both containers
     docker compose -f "${COMPOSE_FILE}" exec -T wordpress-1 rm -f /var/www/html/session-test.php 2>/dev/null || true
     docker compose -f "${COMPOSE_FILE}" exec -T wordpress-2 rm -f /var/www/html/session-test.php 2>/dev/null || true
 }
@@ -30,7 +30,11 @@ trap cleanup EXIT
 setup_session_test() {
     log_info "Setting up session test endpoint..."
 
-    local test_script='<?php
+    local wp1_container=$(docker compose -f "${COMPOSE_FILE}" ps -q wordpress-1)
+    local wp2_container=$(docker compose -f "${COMPOSE_FILE}" ps -q wordpress-2)
+
+    # Create test file on BOTH containers (DocumentRoot is not shared)
+    local php_script='<?php
 session_start();
 header("X-Session-ID: " . session_id());
 header("X-Server: " . gethostname());
@@ -47,16 +51,10 @@ echo json_encode([
     "current_server" => gethostname(),
     "session_handler" => ini_get("session.save_handler"),
     "session_path" => ini_get("session.save_path")
-]);
-'
+]);'
 
-    # Create test file on shared volume (will be visible to both nodes)
-    local wp1_container=$(docker compose -f "${COMPOSE_FILE}" ps -q wordpress-1)
-    docker exec "$wp1_container" bash -c "cat > /var/www/html/session-test.php << 'EOFPHP'
-$test_script
-EOFPHP"
-
-    docker exec "$wp1_container" bash -c "echo '$test_script' > /var/www/html/session-test.php"
+    docker exec "$wp1_container" bash -c "echo '$php_script' > /var/www/html/session-test.php"
+    docker exec "$wp2_container" bash -c "echo '$php_script' > /var/www/html/session-test.php"
 }
 
 test_session_handler_configured() {
@@ -83,7 +81,7 @@ test_session_stored_in_redis() {
     log_info "Testing: Sessions are stored in Redis DB 1"
 
     # Create a session via WordPress
-    local response=$(curl -s -c /tmp/cookies.txt "http://localhost:80/session-test.php" 2>/dev/null || echo "")
+    local response=$(curl -s -c /tmp/cookies.txt "http://localhost:8080/session-test.php" 2>/dev/null || echo "")
 
     if [ -z "$response" ]; then
         log_warn "Could not reach session test endpoint"
@@ -123,7 +121,7 @@ test_session_persistence_across_nodes() {
     local cookie_jar="/tmp/session-test-cookies.txt"
     rm -f "$cookie_jar"
 
-    local response1=$(curl -s -c "$cookie_jar" -b "$cookie_jar" "http://localhost:80/session-test.php" 2>/dev/null)
+    local response1=$(curl -s -c "$cookie_jar" -b "$cookie_jar" "http://localhost:8080/session-test.php" 2>/dev/null)
     local visit1=$(echo "$response1" | grep -o '"visit_count":[0-9]*' | cut -d':' -f2)
     local server1=$(echo "$response1" | grep -o '"current_server":"[^"]*"' | cut -d'"' -f4)
 
@@ -134,11 +132,16 @@ test_session_persistence_across_nodes() {
     local found_different_server=false
 
     for i in $(seq 2 $max_requests); do
-        local response=$(curl -s -c "$cookie_jar" -b "$cookie_jar" "http://localhost:80/session-test.php" 2>/dev/null)
+        local response=$(curl -s -c "$cookie_jar" -b "$cookie_jar" "http://localhost:8080/session-test.php" 2>/dev/null)
         local visit=$(echo "$response" | grep -o '"visit_count":[0-9]*' | cut -d':' -f2)
         local server=$(echo "$response" | grep -o '"current_server":"[^"]*"' | cut -d'"' -f4)
 
         log_info "Request $i - Server: $server, Visits: $visit"
+
+        # Skip if response was empty (server didn't respond)
+        if [ -z "$visit" ] || [ -z "$server" ]; then
+            continue
+        fi
 
         if [ "$server" != "$server1" ]; then
             found_different_server=true

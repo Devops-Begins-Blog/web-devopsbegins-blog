@@ -18,6 +18,36 @@ log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
+ensure_wordpress_installed() {
+    log_info "Ensuring WordPress is installed..."
+
+    local wp1_container=$(docker compose -f "${COMPOSE_FILE}" ps -q wordpress-1)
+
+    # Check if WordPress is already installed
+    if docker exec "$wp1_container" wp core is-installed --allow-root 2>/dev/null; then
+        log_info "WordPress is already installed"
+        return 0
+    fi
+
+    log_info "Installing WordPress..."
+    docker exec "$wp1_container" wp core install \
+        --url="http://localhost:8080" \
+        --title="Test Site" \
+        --admin_user="admin" \
+        --admin_password="admin123" \
+        --admin_email="admin@test.local" \
+        --skip-email \
+        --allow-root 2>/dev/null
+
+    if [ $? -eq 0 ]; then
+        log_info "WordPress installed successfully"
+        return 0
+    else
+        log_error "Failed to install WordPress"
+        return 1
+    fi
+}
+
 test_redis_constants_defined() {
     log_info "Testing: WP_REDIS constants are defined"
 
@@ -84,13 +114,13 @@ test_redis_connectivity_from_wp() {
         \$redis = new Redis();
         try {
             \$redis->connect(getenv('REDIS_HOST') ?: 'redis', getenv('REDIS_PORT') ?: 6379);
-            echo 'connected:' . \$redis->ping();
+            echo \$redis->ping() ? 'connected:OK' : 'connected:FAIL';
         } catch (Exception \$e) {
             echo 'error:' . \$e->getMessage();
         }
     " 2>/dev/null)
 
-    if echo "$result" | grep -q "connected:.*PONG"; then
+    if echo "$result" | grep -q "connected:OK"; then
         log_info "✓ WordPress can connect to Redis"
         return 0
     else
@@ -218,6 +248,9 @@ main() {
         log_error "HA services not running. Start with: docker compose -f docker-compose.ha.yml up -d"
         exit 1
     fi
+
+    # Ensure WordPress is installed before running WP-CLI tests
+    ensure_wordpress_installed || exit 1
 
     local failed=0
 

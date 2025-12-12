@@ -19,8 +19,14 @@ log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 cleanup() {
-    log_info "Cleaning up HA test environment..."
-    docker compose -f "${COMPOSE_FILE}" down -v --remove-orphans 2>/dev/null || true
+    # Skip cleanup if called from run-all-tests.sh (it manages lifecycle)
+    if [ "${SKIP_CLEANUP:-0}" = "1" ]; then
+        log_info "Skipping cleanup (managed by parent script)"
+        return 0
+    fi
+    log_info "Cleaning up HA test environment (preserving MySQL volume)..."
+    docker compose -f "${COMPOSE_FILE}" down --remove-orphans 2>/dev/null || true
+    docker volume rm devopsbegins-wp-content-ha devopsbegins-redis-data 2>/dev/null || true
 }
 
 trap cleanup EXIT
@@ -68,7 +74,7 @@ test_nginx_loadbalancer() {
     local attempt=0
 
     while [ $attempt -lt $max_attempts ]; do
-        if curl -s -o /dev/null -w "%{http_code}" "http://localhost:80" | grep -qE "200|302|301|502"; then
+        if curl -s -o /dev/null -w "%{http_code}" "http://localhost:8080" | grep -qE "200|302|301|502"; then
             log_info "✓ Nginx load balancer responds"
             return 0
         fi
@@ -86,7 +92,7 @@ test_both_wordpress_nodes() {
     local wp1_healthy=false
     local wp2_healthy=false
 
-    # Test wordpress-1 directly
+    # Test wordpress-1 directly (container listens on port 80 internally)
     if docker compose -f "${COMPOSE_FILE}" exec -T wordpress-1 curl -s -o /dev/null -w "%{http_code}" http://localhost:80 | grep -qE "200|302|301"; then
         wp1_healthy=true
         log_info "✓ wordpress-1 responds"
@@ -94,7 +100,7 @@ test_both_wordpress_nodes() {
         log_warn "wordpress-1 may still be initializing"
     fi
 
-    # Test wordpress-2 directly
+    # Test wordpress-2 directly (container listens on port 80 internally)
     if docker compose -f "${COMPOSE_FILE}" exec -T wordpress-2 curl -s -o /dev/null -w "%{http_code}" http://localhost:80 | grep -qE "200|302|301"; then
         wp2_healthy=true
         log_info "✓ wordpress-2 responds"
@@ -118,8 +124,8 @@ test_redis_connectivity() {
     if docker exec "$wp1_container" php -r "
         \$redis = new Redis();
         \$redis->connect('redis', 6379);
-        echo \$redis->ping();
-    " 2>/dev/null | grep -q "PONG"; then
+        echo \$redis->ping() ? 'OK' : 'FAIL';
+    " 2>/dev/null | grep -q "OK"; then
         log_info "✓ Redis is accessible from WordPress"
         return 0
     else
@@ -156,7 +162,7 @@ test_load_distribution() {
     local node2_hits=0
 
     for i in {1..10}; do
-        local response=$(curl -s -I "http://localhost:80" 2>/dev/null | grep -i "X-Served-By" || echo "")
+        local response=$(curl -s -I "http://localhost:8080" 2>/dev/null | grep -i "X-Served-By" || echo "")
         if echo "$response" | grep -q "wordpress-1"; then
             node1_hits=$((node1_hits + 1))
         elif echo "$response" | grep -q "wordpress-2"; then

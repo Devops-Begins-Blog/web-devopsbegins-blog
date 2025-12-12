@@ -19,8 +19,14 @@ log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 cleanup() {
-    log_info "Cleaning up standalone test environment..."
-    docker compose -f "${COMPOSE_FILE}" down -v --remove-orphans 2>/dev/null || true
+    # Skip cleanup if called from run-all-tests.sh (it manages lifecycle)
+    if [ "${SKIP_CLEANUP:-0}" = "1" ]; then
+        log_info "Skipping cleanup (managed by parent script)"
+        return 0
+    fi
+    log_info "Cleaning up standalone test environment (preserving MySQL volume)..."
+    docker compose -f "${COMPOSE_FILE}" down --remove-orphans 2>/dev/null || true
+    docker volume rm devopsbegins-wp-content 2>/dev/null || true
 }
 
 trap cleanup EXIT
