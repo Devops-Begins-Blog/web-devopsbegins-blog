@@ -10,12 +10,12 @@
   - [x] 1.5 Create `docker-image/wordpress/files/entrypoint.sh` for initialization
   - [x] 1.6 Test WordPress image builds successfully
 
-- [ ] 2. Create Docker Compose configuration
-  - [ ] 2.1 Create `docker-compose.yml` with WordPress and MySQL services
-  - [ ] 2.2 Configure internal network for service communication
-  - [ ] 2.3 Define named volumes for wp-content and mysql-data
-  - [ ] 2.4 Set environment variables for WordPress and MySQL
-  - [ ] 2.5 Configure service dependencies and health checks
+- [x] 2. Create Docker Compose configuration
+  - [x] 2.1 Create `docker-compose.yml` with WordPress and MySQL services
+  - [x] 2.2 Configure internal network for service communication
+  - [x] 2.3 Define named volumes for wp-content and mysql-data
+  - [x] 2.4 Set environment variables for WordPress and MySQL
+  - [x] 2.5 Configure service dependencies and health checks
 
 - [ ] 3. Integration testing
   - [ ] 3.1 Run `docker compose up -d` and verify all containers start

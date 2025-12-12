@@ -1,22 +1,85 @@
+# =============================================================================
+# Docker Compose - DevOpsBegins Blog
+# =============================================================================
+#
+# Production-ready WordPress deployment with MySQL 8.0
+#
+# Usage:
+#   docker compose up -d
+#   docker compose down
+#
+# Access:
+#   WordPress: http://localhost:8080
+#
+# =============================================================================
+
 services:
+  # ---------------------------------------------------------------------------
+  # WordPress Service
+  # ---------------------------------------------------------------------------
   wordpress:
     build:
       context: ./docker-image/wordpress
+    container_name: devopsbegins-wordpress
     ports:
       - "8080:80"
     environment:
-      WORDPRESS_MODE: standalone
       WORDPRESS_DB_HOST: mysql
       WORDPRESS_DB_NAME: wordpress
-      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
-      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress_secret_2024
+    volumes:
+      - wp-content:/var/www/html/wp-content
+    networks:
+      - backend
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
 
+  # ---------------------------------------------------------------------------
+  # MySQL Service
+  # ---------------------------------------------------------------------------
   mysql:
     image: mysql:8.0
+    container_name: devopsbegins-mysql
     environment:
       MYSQL_DATABASE: wordpress
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_USER: ${WORDPRESS_DB_USER}
-      MYSQL_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress_secret_2024
+      MYSQL_ROOT_PASSWORD: root_secret_2024
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+# -----------------------------------------------------------------------------
+# Networks
+# -----------------------------------------------------------------------------
+# Internal network - MySQL not exposed to host
+# -----------------------------------------------------------------------------
+networks:
+  backend:
+    driver: bridge
+
+# -----------------------------------------------------------------------------
+# Volumes
+# -----------------------------------------------------------------------------
+# Named volumes for data persistence
+# -----------------------------------------------------------------------------
+volumes:
+  wp-content:
+    name: devopsbegins-wp-content
+  mysql-data:
+    name: devopsbegins-mysql-data
