@@ -2,12 +2,12 @@
 
 ## Tasks
 
-- [ ] 1. **Modify Dockerfile for Distributed Mode Support**
-  - [ ] 1.1 Add PHP Redis extension installation (`pecl install redis`)
-  - [ ] 1.2 Install WP-CLI with checksum verification
-  - [ ] 1.3 Create `/opt/wordpress/wp-content-base` directory (outside DocumentRoot)
-  - [ ] 1.4 Move default wp-content contents to `/opt/wordpress/wp-content-base` after WordPress extraction
-  - [ ] 1.5 Build and verify image builds successfully
+- [x] 1. **Modify Dockerfile for Distributed Mode Support**
+  - [x] 1.1 Add PHP Redis extension installation (`pecl install redis`)
+  - [x] 1.2 Install WP-CLI with checksum verification
+  - [x] 1.3 Create `/opt/wordpress/wp-content-base` directory (outside DocumentRoot)
+  - [x] 1.4 Move default wp-content contents to `/opt/wordpress/wp-content-base` after WordPress extraction
+  - [x] 1.5 Build and verify image builds successfully
 
 - [ ] 2. **Implement Distributed Mode Initialization in entrypoint.sh**
   - [ ] 2.1 Add `wait_for_redis()` function to check Redis availability

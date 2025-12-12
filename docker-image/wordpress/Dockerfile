@@ -101,8 +101,8 @@ RUN docker-php-ext-configure gd \
         exif \
         intl \
         opcache \
-    && pecl install imagick \
-    && docker-php-ext-enable imagick
+    && pecl install imagick redis \
+    && docker-php-ext-enable imagick redis
 
 # -----------------------------------------------------------------------------
 # Apache Configuration
@@ -110,6 +110,22 @@ RUN docker-php-ext-configure gd \
 # Enable mod_rewrite for WordPress permalinks
 # -----------------------------------------------------------------------------
 RUN a2enmod rewrite
+
+# -----------------------------------------------------------------------------
+# WP-CLI Installation
+# -----------------------------------------------------------------------------
+# WP-CLI enables command-line WordPress management
+# Used for automated plugin installation (e.g., Redis Object Cache)
+# Checksum verification for supply chain security
+# -----------------------------------------------------------------------------
+ARG WPCLI_VERSION=2.11.0
+ARG WPCLI_SHA512=adb12146bab8d829621efed41124dcd0012f9027f47e0228be7080296167566070e4a026a09c3989907840b21de94b7a35f3bfbd5f827c12f27c5803546d1bba
+
+RUN set -eux; \
+    curl -o /usr/local/bin/wp -fSL "https://github.com/wp-cli/wp-cli/releases/download/v${WPCLI_VERSION}/wp-cli-${WPCLI_VERSION}.phar"; \
+    echo "${WPCLI_SHA512} */usr/local/bin/wp" | sha512sum -c -; \
+    chmod +x /usr/local/bin/wp; \
+    wp --info --allow-root
 
 # -----------------------------------------------------------------------------
 # PHP Configuration Files
@@ -123,12 +139,23 @@ COPY files/php-wordpress.ini /usr/local/etc/php/conf.d/php-wordpress.ini
 WORKDIR /var/www/html
 
 # Download, verify, and extract WordPress
+# Move wp-content to /opt/wordpress/wp-content-base as seed for volumes
+# At runtime, entrypoint.sh copies base to wp-content if empty (preserves existing data)
 RUN set -eux; \
     curl -o wordpress.tar.gz -fSL "https://wordpress.org/wordpress-${WORDPRESS_VERSION}.tar.gz"; \
     echo "${WORDPRESS_SHA1} *wordpress.tar.gz" | sha1sum -c -; \
     tar -xzf wordpress.tar.gz --strip-components=1; \
     rm wordpress.tar.gz; \
-    chown -R www-data:www-data /var/www/html
+    # Create wp-content-base directory outside DocumentRoot (security)
+    mkdir -p /opt/wordpress/wp-content-base; \
+    # Move wp-content contents to base directory
+    mv /var/www/html/wp-content/* /opt/wordpress/wp-content-base/; \
+    # Ensure standard directories exist in base
+    mkdir -p /opt/wordpress/wp-content-base/uploads; \
+    mkdir -p /opt/wordpress/wp-content-base/plugins; \
+    # Set ownership
+    chown -R www-data:www-data /var/www/html; \
+    chown -R www-data:www-data /opt/wordpress/wp-content-base
 
 # -----------------------------------------------------------------------------
 # Custom Configuration Files
