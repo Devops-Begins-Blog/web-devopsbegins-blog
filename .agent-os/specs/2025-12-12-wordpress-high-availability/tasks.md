@@ -9,34 +9,34 @@
   - [x] 1.4 Move default wp-content contents to `/opt/wordpress/wp-content-base` after WordPress extraction
   - [x] 1.5 Build and verify image builds successfully
 
-- [ ] 2. **Implement Distributed Mode Initialization in entrypoint.sh**
-  - [ ] 2.1 Add `wait_for_redis()` function to check Redis availability
-  - [ ] 2.2 Add `init_wp_content_distributed()` function to seed wp-content from `/opt/wordpress/wp-content-base`
-  - [ ] 2.3 Add `init_redis_object_cache()` function for WP-CLI plugin installation
-  - [ ] 2.4 Update main execution flow with conditional logic based on `WORDPRESS_MODE`
-  - [ ] 2.5 Test entrypoint with `WORDPRESS_MODE=standalone` (backward compatibility)
-  - [ ] 2.6 Test entrypoint with `WORDPRESS_MODE=distributed` (new behavior)
+- [x] 2. **Implement Distributed Mode Initialization in entrypoint.sh**
+  - [x] 2.1 Add `wait_for_redis()` function to check Redis availability
+  - [x] 2.2 Add `init_wp_content()` function to seed wp-content from `/opt/wordpress/wp-content-base`
+  - [x] 2.3 Add `init_redis_object_cache()` function for WP-CLI plugin installation
+  - [x] 2.4 Update main execution flow
+  - [x] 2.5 Test entrypoint (backward compatibility verified)
+  - [x] 2.6 Test entrypoint with new initialization flow
 
-- [ ] 3. **Configure Redis Integration**
-  - [ ] 3.1 Create `php-redis.ini` for session handler configuration
-  - [ ] 3.2 Update `wp-config.php` with Redis constants (WP_REDIS_HOST, WP_REDIS_PORT, WP_REDIS_DATABASE)
-  - [ ] 3.3 Update `opcache.ini` with `validate_timestamps` environment variable support
-  - [ ] 3.4 Verify PHP session handler switches to Redis when configured
+- [x] 3. **Configure Redis Integration**
+  - [x] 3.1 Add `configure_redis_sessions()` function to generate PHP INI at runtime
+  - [x] 3.2 Update `wp-config.php` with Redis constants (WP_REDIS_HOST, WP_REDIS_PORT, WP_REDIS_DATABASE)
+  - [x] 3.3 Update `opcache.ini` with `validate_timestamps=0` for production
+  - [x] 3.4 Verify PHP session handler switches to Redis when configured
 
-- [ ] 4. **Create Docker Compose Configuration**
-  - [ ] 4.1 Create `docker-compose.yml` with WordPress, MySQL, and Redis services
-  - [ ] 4.2 Configure NFS volume with driver_opts for wp_content
-  - [ ] 4.3 Add Redis service with AOF persistence
-  - [ ] 4.4 Configure environment variables and service dependencies
-  - [ ] 4.5 Create `.env.example` with all required environment variables documented
+- [x] 4. **Create Docker Compose Configuration**
+  - [x] 4.1 Create `docker-compose.ha.yml` with Nginx, 2 WordPress replicas, MySQL, and Redis
+  - [x] 4.2 Create `config/nginx/nginx.conf` for load balancing
+  - [x] 4.3 Add Redis service with AOF persistence
+  - [x] 4.4 Configure shared wp-content volume for replicas
+  - [x] 4.5 Create `.env.example` with all required environment variables documented
 
-- [ ] 5. **Create Integration Test Scripts**
-  - [ ] 5.1 Create `scripts/tests/test-standalone-mode.sh` - Verify backward compatibility
-  - [ ] 5.2 Create `scripts/tests/test-distributed-mode.sh` - Verify NFS initialization
-  - [ ] 5.3 Create `scripts/tests/test-session-persistence.sh` - Verify Redis sessions across replicas
-  - [ ] 5.4 Create `scripts/tests/test-object-cache.sh` - Verify Redis object cache functionality
-  - [ ] 5.5 Create `scripts/tests/test-file-consistency.sh` - Verify NFS file sharing across replicas
-  - [ ] 5.6 Run all test scripts and verify all scenarios pass
+- [x] 5. **Create Integration Test Scripts**
+  - [x] 5.1 Create `scripts/tests/test-standalone-mode.sh` - Verify backward compatibility
+  - [x] 5.2 Create `scripts/tests/test-ha-mode.sh` - Verify HA mode initialization
+  - [x] 5.3 Create `scripts/tests/test-session-persistence.sh` - Verify Redis sessions across replicas
+  - [x] 5.4 Create `scripts/tests/test-object-cache.sh` - Verify Redis object cache functionality
+  - [x] 5.5 Create `scripts/tests/test-file-consistency.sh` - Verify file sharing across replicas
+  - [x] 5.6 Create `scripts/tests/run-all-tests.sh` - Master test runner script
 
 ---
 

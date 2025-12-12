@@ -1,0 +1,185 @@
+# =============================================================================
+# Docker Compose - DevOpsBegins Blog (High Availability Mode)
+# =============================================================================
+#
+# Production-ready WordPress deployment with horizontal scaling:
+#   - Nginx load balancer (round-robin between WordPress replicas)
+#   - 2 WordPress replicas for high availability
+#   - Redis for session persistence and object cache
+#   - Shared volume for wp-content (local or NFS)
+#   - MySQL 8.0 database
+#
+# Usage:
+#   # Start services:
+#   docker compose -f docker-compose.ha.yml up -d
+#
+#   # View logs:
+#   docker compose -f docker-compose.ha.yml logs -f
+#
+#   # Stop services:
+#   docker compose -f docker-compose.ha.yml down
+#
+# Access:
+#   WordPress (via load balancer): http://localhost:8080
+#
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Nginx Load Balancer
+  # ---------------------------------------------------------------------------
+  # Distributes traffic across WordPress replicas using round-robin
+  # ---------------------------------------------------------------------------
+  nginx:
+    image: nginx:alpine
+    container_name: devopsbegins-nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - backend
+    depends_on:
+      - wordpress-1
+      - wordpress-2
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # WordPress Replica 1
+  # ---------------------------------------------------------------------------
+  wordpress-1:
+    build:
+      context: ./docker-image/wordpress
+    container_name: devopsbegins-wordpress-1
+    environment:
+      # Database
+      WORDPRESS_DB_HOST: mysql
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME:-wordpress}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER:-wordpress}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD:-wordpress_secret_2024}
+      # Redis (enables sessions and object cache)
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # Debug (disable in production)
+      WORDPRESS_DEBUG: ${WORDPRESS_DEBUG:-false}
+    volumes:
+      - wp-content:/var/www/html/wp-content
+    networks:
+      - backend
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # WordPress Replica 2
+  # ---------------------------------------------------------------------------
+  wordpress-2:
+    build:
+      context: ./docker-image/wordpress
+    container_name: devopsbegins-wordpress-2
+    environment:
+      # Database
+      WORDPRESS_DB_HOST: mysql
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME:-wordpress}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER:-wordpress}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD:-wordpress_secret_2024}
+      # Redis (enables sessions and object cache)
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # Debug (disable in production)
+      WORDPRESS_DEBUG: ${WORDPRESS_DEBUG:-false}
+    volumes:
+      - wp-content:/var/www/html/wp-content
+    networks:
+      - backend
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Redis Service
+  # ---------------------------------------------------------------------------
+  # Used for:
+  #   - PHP session storage (DB 1) - enables session persistence across replicas
+  #   - WordPress object cache (DB 0) - reduces MySQL queries
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: devopsbegins-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # MySQL Service
+  # ---------------------------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: devopsbegins-mysql
+    environment:
+      MYSQL_DATABASE: ${WORDPRESS_DB_NAME:-wordpress}
+      MYSQL_USER: ${WORDPRESS_DB_USER:-wordpress}
+      MYSQL_PASSWORD: ${WORDPRESS_DB_PASSWORD:-wordpress_secret_2024}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_secret_2024}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+# -----------------------------------------------------------------------------
+# Networks
+# -----------------------------------------------------------------------------
+networks:
+  backend:
+    driver: bridge
+
+# -----------------------------------------------------------------------------
+# Volumes
+# -----------------------------------------------------------------------------
+# Shared volume for wp-content across both WordPress replicas
+# For NFS in production, replace with NFS driver configuration
+# -----------------------------------------------------------------------------
+volumes:
+  # Shared wp-content volume (both replicas mount the same volume)
+  wp-content:
+    name: devopsbegins-wp-content-ha
+
+  # For NFS deployment, uncomment and configure:
+  # wp-content:
+  #   driver: local
+  #   driver_opts:
+  #     type: nfs
+  #     o: addr=${NFS_SERVER},nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2
+  #     device: ":${NFS_PATH}"
+
+  redis-data:
+    name: devopsbegins-redis-data
+
+  mysql-data:
+    name: devopsbegins-mysql-data-ha

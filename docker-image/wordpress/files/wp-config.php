@@ -110,6 +110,20 @@ define('WP_POST_REVISIONS', 10);
 define('EMPTY_TRASH_DAYS', 7);
 
 // =============================================================================
+// Redis Object Cache Configuration
+// =============================================================================
+// Used by Redis Object Cache plugin for persistent caching
+// Object cache uses Redis DB 0 (sessions use DB 1, configured in PHP INI)
+
+if (getenv('REDIS_HOST')) {
+    define('WP_REDIS_HOST', getenv('REDIS_HOST'));
+    define('WP_REDIS_PORT', getenv('REDIS_PORT') ?: 6379);
+    define('WP_REDIS_DATABASE', 0);  // DB 0 for object cache
+    define('WP_REDIS_TIMEOUT', 1);
+    define('WP_REDIS_READ_TIMEOUT', 1);
+}
+
+// =============================================================================
 // Performance Optimizations
 // =============================================================================
 
