@@ -17,13 +17,13 @@
   - [x] 2.4 Set environment variables for WordPress and MySQL
   - [x] 2.5 Configure service dependencies and health checks
 
-- [ ] 3. Integration testing
-  - [ ] 3.1 Run `docker compose up -d` and verify all containers start
-  - [ ] 3.2 Access WordPress installation wizard via browser
-  - [ ] 3.3 Complete WordPress setup and create test post
-  - [ ] 3.4 Verify data persists after `docker compose down && docker compose up -d`
+- [x] 3. Integration testing
+  - [x] 3.1 Run `docker compose up -d` and verify all containers start
+  - [x] 3.2 Access WordPress installation wizard via browser
+  - [x] 3.3 Complete WordPress setup and create test post
+  - [x] 3.4 Verify data persists after `docker compose down && docker compose up -d`
 
-- [ ] 4. Documentation
-  - [ ] 4.1 Create `docs/phase-1-wordpress-setup.md` with architecture overview
-  - [ ] 4.2 Document architecture decision (Apache vs Nginx)
-  - [ ] 4.3 Add setup instructions and troubleshooting guide
+- [x] 4. Documentation
+  - [x] 4.1 Create `docs/phase-1-wordpress-setup.md` with architecture overview
+  - [x] 4.2 Document architecture decision (Apache vs Nginx)
+  - [x] 4.3 Add setup instructions and troubleshooting guide
