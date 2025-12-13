@@ -1,0 +1,60 @@
+# Example values for standalone mode (development/testing)
+# Usage: helm install wordpress ./helm-chart/wordpress -f ./helm-chart/wordpress/values-standalone.yaml
+
+mode: standalone
+replicaCount: 1
+
+image:
+  repository: devopsbegins/wordpress
+  tag: "6.9"
+  pullPolicy: IfNotPresent
+
+wordpress:
+  tablePrefix: "wp_"
+  debug: true  # Enable debug for development
+
+# MySQL subchart enabled
+mysql:
+  enabled: true
+  auth:
+    database: wordpress
+    username: wordpress
+    password: "wordpress_dev_2024"      # Change in production!
+    rootPassword: "root_dev_2024"        # Change in production!
+  primary:
+    persistence:
+      enabled: true
+      size: 5Gi
+
+# Redis disabled in standalone mode
+redis:
+  enabled: false
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+
+# No Ingress for local development
+ingress:
+  enabled: false
+
+# Persistence for wp-content
+persistence:
+  enabled: true
+  size: 5Gi
+  accessModes:
+    - ReadWriteOnce
+
+# Development resources (lower limits)
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
+
+# No autoscaling in standalone mode
+autoscaling:
+  enabled: false

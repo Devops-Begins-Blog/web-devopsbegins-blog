@@ -1,0 +1,34 @@
+{{- include "wordpress.validateConfig" . -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "wordpress.fullname" . }}-config
+  labels:
+    {{- include "wordpress.labels" . | nindent 4 }}
+data:
+  # WordPress Database Configuration
+  WORDPRESS_DB_HOST: "{{ include "wordpress.databaseHost" . }}:{{ include "wordpress.databasePort" . }}"
+  WORDPRESS_DB_NAME: {{ include "wordpress.databaseName" . | quote }}
+  WORDPRESS_DB_USER: {{ include "wordpress.databaseUser" . | quote }}
+  WORDPRESS_TABLE_PREFIX: {{ .Values.wordpress.tablePrefix | quote }}
+  WORDPRESS_DEBUG: {{ .Values.wordpress.debug | quote }}
+
+  {{- if .Values.wordpress.siteUrl }}
+  WORDPRESS_SITE_URL: {{ .Values.wordpress.siteUrl | quote }}
+  {{- end }}
+
+  # Deployment mode
+  WORDPRESS_MODE: {{ .Values.mode | quote }}
+
+  {{- if eq .Values.mode "distributed" }}
+  # Redis Configuration (distributed mode)
+  REDIS_HOST: {{ include "wordpress.redisHost" . | quote }}
+  REDIS_PORT: {{ include "wordpress.redisPort" . | quote }}
+  WP_REDIS_HOST: {{ include "wordpress.redisHost" . | quote }}
+  WP_REDIS_PORT: {{ include "wordpress.redisPort" . | quote }}
+  WP_REDIS_DATABASE: {{ include "wordpress.redisDatabase" . | quote }}
+
+  # PHP Session Configuration (Redis-backed)
+  PHP_SESSION_HANDLER: "redis"
+  PHP_SESSION_SAVE_PATH: "tcp://{{ include "wordpress.redisHost" . }}:{{ include "wordpress.redisPort" . }}?database={{ include "wordpress.redisSessionDatabase" . }}"
+  {{- end }}

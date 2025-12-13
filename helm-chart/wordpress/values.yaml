@@ -1,0 +1,235 @@
+# WordPress Helm Chart - Default Values
+# This chart supports two deployment modes:
+# - standalone: Single replica, no Redis (development/testing)
+# - distributed: Multiple replicas with Redis for sessions (production/HA)
+
+# Deployment mode: standalone | distributed
+mode: standalone
+
+# Number of WordPress replicas
+# In standalone mode, this is forced to 1
+# In distributed mode, minimum is 2
+replicaCount: 1
+
+# WordPress image configuration
+image:
+  repository: devopsbegins/wordpress
+  # Tag defaults to chart appVersion if empty
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# Image pull secrets for private registries
+imagePullSecrets: []
+
+# Override chart name
+nameOverride: ""
+fullnameOverride: ""
+
+# WordPress configuration
+wordpress:
+  # Site URL (auto-detected from Ingress if empty)
+  siteUrl: ""
+  # Database table prefix
+  tablePrefix: "wp_"
+  # Enable WordPress debug mode
+  debug: false
+  # Additional environment variables
+  extraEnv: []
+  # - name: CUSTOM_VAR
+  #   value: "custom-value"
+
+# ------------------------------------------------------------------------------
+# MySQL Configuration (Bitnami subchart)
+# ------------------------------------------------------------------------------
+mysql:
+  # Enable MySQL subchart
+  # Set to false to use external database
+  enabled: true
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/mysql
+    tag: 9.4.0-debian-12-r1
+  auth:
+    database: wordpress
+    username: wordpress
+    # Password for WordPress user (required if enabled)
+    password: ""
+    # Root password (required if enabled)
+    rootPassword: ""
+  primary:
+    persistence:
+      enabled: true
+      size: 8Gi
+      # storageClass: ""
+
+# External MySQL configuration
+# Used when mysql.enabled=false
+externalDatabase:
+  host: ""
+  port: 3306
+  database: wordpress
+  user: wordpress
+  password: ""
+  # Use existing secret for password
+  existingSecret: ""
+  existingSecretPasswordKey: password
+
+# ------------------------------------------------------------------------------
+# Redis Configuration (Bitnami subchart)
+# ------------------------------------------------------------------------------
+# Redis is auto-enabled in distributed mode unless externalRedis is configured
+redis:
+  # Enable Redis subchart
+  enabled: false
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/redis
+    tag: latest
+  architecture: standalone
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: true
+      size: 1Gi
+      # storageClass: ""
+
+# External Redis configuration
+# Used when redis.enabled=false and mode=distributed
+externalRedis:
+  host: ""
+  port: 6379
+  password: ""
+  # Database for object cache
+  database: 0
+  # Database for PHP sessions
+  sessionDatabase: 1
+  # Use existing secret for password
+  existingSecret: ""
+  existingSecretPasswordKey: password
+
+# ------------------------------------------------------------------------------
+# Service Configuration
+# ------------------------------------------------------------------------------
+service:
+  type: ClusterIP
+  port: 80
+  # nodePort: 30080  # Only used when type is NodePort
+  annotations: {}
+
+# ------------------------------------------------------------------------------
+# Ingress Configuration
+# ------------------------------------------------------------------------------
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: wordpress.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  # - secretName: wordpress-tls
+  #   hosts:
+  #     - wordpress.local
+
+# ------------------------------------------------------------------------------
+# Persistence Configuration
+# ------------------------------------------------------------------------------
+persistence:
+  enabled: true
+  # StorageClass for PVC
+  # Leave empty for default StorageClass
+  # For distributed mode, must support ReadWriteMany
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce  # Change to ReadWriteMany for distributed mode
+  size: 10Gi
+  # Use existing PVC instead of creating one
+  existingClaim: ""
+  annotations: {}
+
+# ------------------------------------------------------------------------------
+# Resource Configuration
+# ------------------------------------------------------------------------------
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# ------------------------------------------------------------------------------
+# Autoscaling Configuration (distributed mode only)
+# ------------------------------------------------------------------------------
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+# ------------------------------------------------------------------------------
+# Health Check Configuration
+# ------------------------------------------------------------------------------
+healthCheck:
+  # Liveness probe - restart container if fails
+  liveness:
+    enabled: true
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+    successThreshold: 1
+
+  # Readiness probe - remove from service if fails
+  readiness:
+    enabled: true
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+    successThreshold: 1
+
+  # Startup probe - allow slow startup
+  startup:
+    enabled: true
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 30  # Allow up to 150s for initial startup
+    successThreshold: 1
+
+# ------------------------------------------------------------------------------
+# Pod Configuration
+# ------------------------------------------------------------------------------
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+podAnnotations: {}
+
+podLabels: {}
+
+podSecurityContext:
+  fsGroup: 33  # www-data group
+
+securityContext:
+  runAsUser: 33
+  runAsGroup: 33
+  runAsNonRoot: true
+
+# ------------------------------------------------------------------------------
+# ServiceAccount Configuration
+# ------------------------------------------------------------------------------
+serviceAccount:
+  create: false
+  name: ""
+  annotations: {}
+  automountServiceAccountToken: false

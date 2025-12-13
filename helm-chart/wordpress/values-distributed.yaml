@@ -1,0 +1,115 @@
+# Example values for distributed mode (production/HA)
+# Usage: helm install wordpress ./helm-chart/wordpress -f ./helm-chart/wordpress/values-distributed.yaml
+#
+# PREREQUISITES:
+# - StorageClass with ReadWriteMany support (NFS, GCS Filestore, EFS, Azure Files)
+# - Sufficient cluster resources for MySQL, Redis, and multiple WordPress pods
+
+mode: distributed
+replicaCount: 2
+
+image:
+  repository: devopsbegins/wordpress
+  tag: "6.9"
+  pullPolicy: IfNotPresent
+
+wordpress:
+  tablePrefix: "wp_"
+  debug: false
+
+# MySQL subchart enabled
+mysql:
+  enabled: true
+  auth:
+    database: wordpress
+    username: wordpress
+    password: ""      # REQUIRED: Set via --set mysql.auth.password=xxx
+    rootPassword: ""  # REQUIRED: Set via --set mysql.auth.rootPassword=xxx
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+# Redis subchart enabled for sessions and object cache
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false  # Enable in production with password
+  master:
+    persistence:
+      enabled: true
+      size: 2Gi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+
+# Ingress enabled for production
+ingress:
+  enabled: true
+  className: nginx  # Adjust based on your ingress controller
+  annotations:
+    # Uncomment for cert-manager TLS
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: wordpress.example.com  # Change to your domain
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  # Uncomment for TLS
+  # tls:
+  #   - secretName: wordpress-tls
+  #     hosts:
+  #       - wordpress.example.com
+
+# Persistence with ReadWriteMany for shared wp-content
+persistence:
+  enabled: true
+  storageClass: ""  # Set to your RWX StorageClass (e.g., "nfs-client", "filestore")
+  size: 20Gi
+  # accessModes is automatically set to ReadWriteMany in distributed mode
+
+# Production resources
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Autoscaling enabled
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Pod anti-affinity for HA (spread across nodes)
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: wordpress
+          topologyKey: kubernetes.io/hostname

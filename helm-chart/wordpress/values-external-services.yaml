@@ -1,0 +1,84 @@
+# Example values for external MySQL and Redis (Cloud SQL, Memorystore, RDS, etc.)
+# Usage: helm install wordpress ./helm-chart/wordpress -f ./helm-chart/wordpress/values-external-services.yaml
+#
+# This configuration disables subcharts and connects to external managed services.
+
+mode: distributed
+replicaCount: 2
+
+image:
+  repository: devopsbegins/wordpress
+  tag: "6.9"
+  pullPolicy: IfNotPresent
+
+wordpress:
+  tablePrefix: "wp_"
+  debug: false
+
+# Disable MySQL subchart
+mysql:
+  enabled: false
+
+# External MySQL configuration (e.g., Cloud SQL, RDS)
+externalDatabase:
+  host: "mysql.example.com"  # Your MySQL host
+  port: 3306
+  database: wordpress
+  user: wordpress
+  password: ""  # Set via --set externalDatabase.password=xxx
+  # Or use existing secret:
+  # existingSecret: "mysql-credentials"
+  # existingSecretPasswordKey: "password"
+
+# Disable Redis subchart
+redis:
+  enabled: false
+
+# External Redis configuration (e.g., Memorystore, ElastiCache)
+externalRedis:
+  host: "redis.example.com"  # Your Redis host
+  port: 6379
+  password: ""  # Set if authentication required
+  database: 0           # Object cache
+  sessionDatabase: 1    # PHP sessions
+  # Or use existing secret:
+  # existingSecret: "redis-credentials"
+  # existingSecretPasswordKey: "password"
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+
+# Ingress enabled
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: wordpress.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Persistence with ReadWriteMany
+persistence:
+  enabled: true
+  storageClass: ""  # Set to your RWX StorageClass
+  size: 20Gi
+
+# Production resources
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Autoscaling
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70

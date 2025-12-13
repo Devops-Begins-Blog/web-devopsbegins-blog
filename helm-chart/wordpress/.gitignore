@@ -1,0 +1,7 @@
+# Helm dependencies (downloaded via helm dependency update)
+charts/
+*.tgz
+
+# Chart.lock can be committed for reproducible builds
+# Uncomment to ignore:
+# Chart.lock

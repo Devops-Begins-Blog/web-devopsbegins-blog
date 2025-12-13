@@ -1,0 +1,31 @@
+apiVersion: v2
+name: wordpress
+description: A Helm chart for WordPress with standalone and distributed (HA) deployment modes
+type: application
+version: 0.1.0
+appVersion: "6.9"
+
+keywords:
+  - wordpress
+  - cms
+  - blog
+  - php
+  - apache
+
+home: https://github.com/devopsbegins/web-devopsbegins-blog
+sources:
+  - https://github.com/devopsbegins/web-devopsbegins-blog
+
+maintainers:
+  - name: DevOpsBegins
+    url: https://blog.devopsbegins.com
+
+dependencies:
+  - name: mysql
+    version: "~11.1"
+    repository: "oci://registry-1.docker.io/bitnamicharts"
+    condition: mysql.enabled
+  - name: redis
+    version: "~20.0"
+    repository: "oci://registry-1.docker.io/bitnamicharts"
+    condition: redis.enabled

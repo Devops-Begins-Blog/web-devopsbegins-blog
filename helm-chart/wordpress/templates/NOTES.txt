@@ -1,0 +1,125 @@
+
+================================================================================
+  WordPress has been deployed!
+================================================================================
+
+Deployment Mode: {{ .Values.mode }}
+Replicas: {{ include "wordpress.replicaCount" . }}
+
+{{- if eq .Values.mode "distributed" }}
+
+  NOTE: Distributed mode is enabled with Redis for session persistence.
+  Ensure your storage class supports ReadWriteMany for wp-content sharing.
+
+{{- end }}
+
+--------------------------------------------------------------------------------
+ACCESSING WORDPRESS
+--------------------------------------------------------------------------------
+
+{{- if .Values.ingress.enabled }}
+
+WordPress is accessible via Ingress:
+
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+
+{{- else if contains "NodePort" .Values.service.type }}
+
+Get the WordPress URL by running:
+
+  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "wordpress.fullname" . }})
+  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo "WordPress URL: http://$NODE_IP:$NODE_PORT"
+
+{{- else if contains "LoadBalancer" .Values.service.type }}
+
+Get the WordPress URL by running:
+
+  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "wordpress.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  echo "WordPress URL: http://$SERVICE_IP:{{ .Values.service.port }}"
+
+{{- else if contains "ClusterIP" .Values.service.type }}
+
+Get the WordPress URL by running:
+
+  kubectl port-forward --namespace {{ .Release.Namespace }} svc/{{ include "wordpress.fullname" . }} 8080:{{ .Values.service.port }}
+  echo "WordPress URL: http://127.0.0.1:8080"
+
+{{- end }}
+
+--------------------------------------------------------------------------------
+DATABASE CONNECTION
+--------------------------------------------------------------------------------
+
+{{- if .Values.mysql.enabled }}
+
+MySQL is deployed as a subchart:
+  Host: {{ include "wordpress.databaseHost" . }}
+  Port: {{ include "wordpress.databasePort" . }}
+  Database: {{ include "wordpress.databaseName" . }}
+  User: {{ include "wordpress.databaseUser" . }}
+
+{{- else }}
+
+Using external MySQL:
+  Host: {{ .Values.externalDatabase.host }}
+  Port: {{ .Values.externalDatabase.port }}
+  Database: {{ .Values.externalDatabase.database }}
+  User: {{ .Values.externalDatabase.user }}
+
+{{- end }}
+
+{{- if eq .Values.mode "distributed" }}
+
+--------------------------------------------------------------------------------
+REDIS CONNECTION
+--------------------------------------------------------------------------------
+
+{{- if .Values.redis.enabled }}
+
+Redis is deployed as a subchart:
+  Host: {{ include "wordpress.redisHost" . }}
+  Port: {{ include "wordpress.redisPort" . }}
+  Object Cache DB: {{ include "wordpress.redisDatabase" . }}
+  Session DB: {{ include "wordpress.redisSessionDatabase" . }}
+
+{{- else }}
+
+Using external Redis:
+  Host: {{ .Values.externalRedis.host }}
+  Port: {{ .Values.externalRedis.port }}
+  Object Cache DB: {{ .Values.externalRedis.database }}
+  Session DB: {{ .Values.externalRedis.sessionDatabase }}
+
+{{- end }}
+{{- end }}
+
+--------------------------------------------------------------------------------
+HEALTH CHECK
+--------------------------------------------------------------------------------
+
+Check pod health status:
+
+  kubectl get pods --namespace {{ .Release.Namespace }} -l "{{ include "wordpress.selectorLabels" . | replace ": " "=" | replace "\n" "," }}"
+
+View health check details:
+
+  kubectl describe pod --namespace {{ .Release.Namespace }} -l "{{ include "wordpress.selectorLabels" . | replace ": " "=" | replace "\n" "," }}"
+
+--------------------------------------------------------------------------------
+TROUBLESHOOTING
+--------------------------------------------------------------------------------
+
+View WordPress logs:
+
+  kubectl logs --namespace {{ .Release.Namespace }} -l "{{ include "wordpress.selectorLabels" . | replace ": " "=" | replace "\n" "," }}" -f
+
+Test health endpoint:
+
+  kubectl exec --namespace {{ .Release.Namespace }} deploy/{{ include "wordpress.fullname" . }} -- curl -s localhost/health.php | jq
+
+================================================================================
