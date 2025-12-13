@@ -111,11 +111,15 @@ wait_for_redis() {
 # Only creates the file if REDIS_HOST is set AND file doesn't exist
 # This allows mounting a custom config externally
 # Sessions use Redis DB 1 (DB 0 is for object cache)
+#
+# NOTE: In Kubernetes with securityContext.runAsNonRoot, an initContainer
+# handles creating this file before this container starts (cannot write to
+# /usr/local/etc/php/conf.d/ as non-root).
 # -----------------------------------------------------------------------------
 configure_redis_sessions() {
     PHP_INI_PATH="/usr/local/etc/php/conf.d/redis-sessions.ini"
 
-    # Check if custom config was mounted externally
+    # Check if custom config was mounted externally (e.g., by Kubernetes initContainer)
     if [ -f "${PHP_INI_PATH}" ]; then
         log "Redis sessions config already exists, preserving custom configuration"
         return 0
@@ -123,6 +127,12 @@ configure_redis_sessions() {
 
     if [ -z "${REDIS_HOST}" ]; then
         log "REDIS_HOST not set, using default file-based sessions"
+        return 0
+    fi
+
+    # Check if we're running as non-root (Kubernetes mode)
+    if [ "$(id -u)" != "0" ]; then
+        log "Running as non-root, skipping Redis session config (should be created by initContainer)"
         return 0
     fi
 
@@ -227,10 +237,29 @@ init_redis_object_cache() {
 # -----------------------------------------------------------------------------
 # Ensure wp-content is writable for uploads, plugins, and themes
 # This is especially important when using Docker volumes
+#
+# NOTE: In Kubernetes with securityContext.runAsNonRoot, this container runs
+# as www-data (UID 33) and cannot chown. In that case, an initContainer
+# with root privileges handles permissions before this container starts.
 # -----------------------------------------------------------------------------
 fix_permissions() {
     log "Setting file permissions..."
 
+    # Check if we're running as root (UID 0)
+    # In Kubernetes with runAsNonRoot, we run as www-data (UID 33)
+    if [ "$(id -u)" != "0" ]; then
+        log "Running as non-root (UID $(id -u)), skipping chown (handled by initContainer in K8s)"
+        # Still create directories if needed, but without chown
+        for dir in uploads plugins themes; do
+            if [ ! -d "${WP_CONTENT}/${dir}" ]; then
+                mkdir -p "${WP_CONTENT}/${dir}" 2>/dev/null || true
+                log "Created ${dir} directory"
+            fi
+        done
+        return 0
+    fi
+
+    # Running as root - full permissions setup (Docker Compose mode)
     # Ensure wp-content exists and is owned by www-data
     if [ -d "${WP_CONTENT}" ]; then
         chown -R www-data:www-data "${WP_CONTENT}"

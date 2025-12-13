@@ -161,6 +161,7 @@ RUN set -eux; \
 # Custom Configuration Files
 # -----------------------------------------------------------------------------
 COPY files/wp-config.php /var/www/html/wp-config.php
+COPY files/health.php /var/www/html/health.php
 COPY files/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
